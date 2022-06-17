@@ -63,6 +63,18 @@ The ```client``` parameter is a ```*redis.Client```
 The 2nd parameter is a 32 byte key used for encrypting the sessions
 The 3rd parameter is the time in seconds that represents how long the session will live before it is expired by redis.
 
+The 2 kinds of store implement the ```GenericStore``` interface, which is so defined:
+
+```Go
+type GenericStore interface {
+	Get(r *http.Request, name string) (*GenericSession, error)
+	GetExisting(r *http.Request, name string) (*GenericSession, error)
+	Save(s *GenericSession, r *http.Request, w http.ResponseWriter) error
+	Delete(s *GenericSession) (int64, error)
+	Close() error
+}
+```
+
 To create a session using the web session store, do:
 
 ```Go

@@ -226,6 +226,10 @@ func (s *Session) GetAny(key string) interface{} {
 	return s.Values[key]
 }
 
+func (s *Session) DeleteAny(key string) {
+	delete(s.Values, key)
+}
+
 // NewCookie returns an http.Cookie with the options set. It also sets
 // the Expires field calculated based on the MaxAge value, for Internet
 // Explorer compatibility.

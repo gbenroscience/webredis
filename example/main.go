@@ -25,6 +25,10 @@ func main() {
 	// Assume this request is from your HandlerFunc and is initialized of course:
 
 	sess, err := redisSessionStore.Get(&r, "user")
+	if err != nil {
+		fmt.Printf("error: %v", err)
+	}
+	fmt.Println("session id: ", sess.ID)
 
 	//etc.
 

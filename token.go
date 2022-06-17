@@ -80,47 +80,40 @@ func (rts *RedisTokenStore) Get(r *http.Request, name string) (*Session, error) 
 	session := new(Session)
 	rs := rts.RedisClient
 
-	if c, err := r.Cookie(name); err == nil {
-		sessionID := c.Value
-		if len(sessionID) > 0 {
-			var sessText string
-			redisStat, err := rs.Get(sessionID, &sessText)
+	if sessionID := r.Header.Get(name); len(sessionID) > 0 {
 
+		var sessText string
+		redisStat, err := rs.Get(sessionID, &sessText)
+
+		if err != nil {
+			//redis may be running on a configuration where it does not save to disk when power is lost.
+			// So give the user a new session here.
+			session = create(r, name, rts.MaxAgeDefault)
+			return session, nil
+		}
+
+		if redisStat == RedisRecordFound {
+			// The cached session was retrieved
+			session, err = rts.fromToken(sessText)
 			if err != nil {
-				//redis may be running on a configuration where it does not save to disk when power is lost.
-				// So give the user a new session here.
+				//Data corruption occurred either with redis or the AES algorithm. Give a new session, please
 				session = create(r, name, rts.MaxAgeDefault)
 				return session, nil
 			}
-
-			if redisStat == RedisRecordFound {
-				// The cached session was retrieved
-				session, err = rts.fromToken(sessText)
-				if err != nil {
-					//Data corruption occurred either with redis or the AES algorithm. Give a new session, please
-					session = create(r, name, rts.MaxAgeDefault)
-					return session, nil
-				}
-				session.IsNew = false
-				return session, nil
-			} else if redisStat == RedisRecordNotFound {
-				//Session possibly has expired in redis; most likely
-				session = create(r, name, rts.MaxAgeDefault)
-				return session, nil
-			} else {
-				//Weird, weird, weird
-				session = create(r, name, rts.MaxAgeDefault)
-				return session, nil
-			}
+			session.IsNew = false
+			return session, nil
+		} else if redisStat == RedisRecordNotFound {
+			//Session possibly has expired in redis; most likely
+			session = create(r, name, rts.MaxAgeDefault)
+			return session, nil
 		} else {
-			//Session cookie set, but with no value... programming error most likely
-			//Most likely from registration or login, since no session header exists
+			//Weird, weird, weird
 			session = create(r, name, rts.MaxAgeDefault)
 			return session, nil
 		}
 
 	} else {
-		//Session cookie not set
+		//Session header set, but with no value... programming error most likely
 		//Most likely from registration or login, since no session header exists
 		session = create(r, name, rts.MaxAgeDefault)
 		return session, nil

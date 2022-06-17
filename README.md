@@ -103,6 +103,34 @@ sess.StoreAny("anykey-goes", boy)
 
 Both the webredis.Session and the sessions.Session have these functions
 
+To delete some data from a session, do:
+
+```Go
+sess.DeleteAny("field")
+```
+
+Once you have saved data to, or deleted data from a Session, make sure you persist it to **redis** by calling:
+```Go
+webSessionStore.Save(sess,r,w)
+```
+, where ```r``` is a ```*http.Request``` and ```w``` is a ```http.ResponseWriter```
+
+The same applies also to the generic store:
+```Go
+redisTokenStore.Save(sess,r,w)
+```
+, where ```r``` is a ```*http.Request``` and ```w``` is a ```http.ResponseWriter```
+
+
+You may delete a session totally by doing:
+
+```Go
+redisTokenStore.Delete(sess)
+webSessionStore.Delete(sess)
+```
+
+
+
 When closing your server application, remember to call ```webSessionStore.Close()``` or ```redisTokenStore.Close()```
 This will close the connections to ```redis```
 

@@ -14,12 +14,12 @@ import (
 )
 
 type RedisSessionStore struct {
-	RedisClient *webredis.RedisStore
+	rcl *webredis.RedisStore
 	//Encryption keys for session data
-	Keys string
+	keys string
 	//applies to all sessions created in seconds, you may customize on the individual sessions
 	// using session.Options.MaxAge = ...
-	MaxAgeDefault int
+	maxAgeDefault int
 }
 
 type Options struct {
@@ -51,13 +51,13 @@ type Session struct {
 // secretKey: A 32 bytes long string to use for encrypting(using AES) and decryptng the session data
 // defaultSessionAge: The age to apply to all sessions by default.It may be changed per session later
 func NewWebRedisStore(redisClient *redis.Client, secretKey string, defaultSessionAge int) *RedisSessionStore {
-	return &RedisSessionStore{RedisClient: &webredis.RedisStore{Conn: redisClient}, MaxAgeDefault: 1800}
+	return &RedisSessionStore{rcl: &webredis.RedisStore{Conn: redisClient}, maxAgeDefault: defaultSessionAge}
 }
 
 // GetExisting returns a Session if one exists
 func (rss *RedisSessionStore) GetExisting(sessionID string) (*Session, error) {
 	session := new(Session)
-	rs := rss.RedisClient
+	rs := rss.rcl
 
 	var sessText string
 	redisStat, err := rs.Get(sessionID, &sessText)
@@ -79,7 +79,7 @@ func (rss *RedisSessionStore) GetExisting(sessionID string) (*Session, error) {
 // Get returns a Session if one exists, or creates a new one if not
 func (rss *RedisSessionStore) Get(r *http.Request, name string) (*Session, error) {
 	session := new(Session)
-	rs := rss.RedisClient
+	rs := rss.rcl
 
 	if c, err := r.Cookie(name); err == nil {
 		sessionID := c.Value
@@ -90,7 +90,7 @@ func (rss *RedisSessionStore) Get(r *http.Request, name string) (*Session, error
 			if err != nil {
 				//redis may be running on a configuration where it does not save to disk when power is lost.
 				// So give the user a new session here.
-				session = create(r, name, rss.MaxAgeDefault)
+				session = create(r, name, rss.maxAgeDefault)
 				return session, nil
 			}
 
@@ -99,31 +99,31 @@ func (rss *RedisSessionStore) Get(r *http.Request, name string) (*Session, error
 				session, err = rss.fromToken(sessText)
 				if err != nil {
 					//Data corruption occurred either with redis or the AES algorithm. Give a new session, please
-					session = create(r, name, rss.MaxAgeDefault)
+					session = create(r, name, rss.maxAgeDefault)
 					return session, nil
 				}
 				session.IsNew = false
 				return session, nil
 			} else if redisStat == webredis.RedisRecordNotFound {
 				//Session possibly has expired in redis; most likely
-				session = create(r, name, rss.MaxAgeDefault)
+				session = create(r, name, rss.maxAgeDefault)
 				return session, nil
 			} else {
 				//Weird, weird, weird
-				session = create(r, name, rss.MaxAgeDefault)
+				session = create(r, name, rss.maxAgeDefault)
 				return session, nil
 			}
 		} else {
 			//Session cookie set, but with no value... programming error most likely
 			//Most likely from registration or login, since no session header exists
-			session = create(r, name, rss.MaxAgeDefault)
+			session = create(r, name, rss.maxAgeDefault)
 			return session, nil
 		}
 
 	} else {
 		//Session cookie not set
 		//Most likely from registration or login, since no session header exists
-		session = create(r, name, rss.MaxAgeDefault)
+		session = create(r, name, rss.maxAgeDefault)
 		return session, nil
 	}
 
@@ -251,7 +251,7 @@ func NewCookie(name, value string, options *Options) *http.Cookie {
 func (rss *RedisSessionStore) token(s *Session) (string, error) {
 	jsn := utils.Stringify(s)
 
-	k, err := utils.NewKryptik(rss.Keys, utils.ModeCBC)
+	k, err := utils.NewKryptik(rss.keys, utils.ModeCBC)
 	if err != nil {
 		return "", err
 	}
@@ -260,7 +260,7 @@ func (rss *RedisSessionStore) token(s *Session) (string, error) {
 
 // Token regenerate the oiginal Session from its token
 func (rss *RedisSessionStore) fromToken(sessionToken string) (*Session, error) {
-	k, err := utils.NewKryptik(rss.Keys, utils.ModeCBC)
+	k, err := utils.NewKryptik(rss.keys, utils.ModeCBC)
 	if err != nil {
 		return nil, err
 	}
@@ -281,7 +281,7 @@ func (rss *RedisSessionStore) Save(s *Session, r *http.Request, w http.ResponseW
 	if err != nil {
 		return err
 	}
-	redisStat, err := rss.RedisClient.SetWithExpiry(s.ID, tkn, int64(s.Options.MaxAge)) // save session to redis
+	redisStat, err := rss.rcl.SetWithExpiry(s.ID, tkn, int64(s.Options.MaxAge)) // save session to redis
 	if redisStat == webredis.RedisRecordUpdated {
 		http.SetCookie(w, NewCookie(s.Name, s.ID, s.Options)) // send session id to browser as cookie
 	}
@@ -290,11 +290,11 @@ func (rss *RedisSessionStore) Save(s *Session, r *http.Request, w http.ResponseW
 
 // Delete Manually delete the session from redis
 func (rss *RedisSessionStore) Delete(s *Session) (int64, error) {
-	rs := rss.RedisClient
+	rs := rss.rcl
 	return rs.Delete(s.ID)
 }
 
 // Close the redis connection once you are done
 func (rts *RedisSessionStore) Close() error {
-	return rts.RedisClient.Close()
+	return rts.rcl.Close()
 }

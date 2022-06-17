@@ -14,20 +14,19 @@ import (
 // RedisTokenStore Manages tokens usable with REST APIS and saves them to redis.
 // Writes them to the specified header in the response automatically when the request has been processed
 type RedisTokenStore struct {
-	RedisClient *RedisStore
+	rcl *RedisStore
 	//Encryption keys for token data
-	Keys string
+	keys string
 	//applies to all sessions created in seconds, you may customize on the individual sessions
 	// using session.Options.MaxAge = ...
-	MaxAgeDefault int
-	HeaderName    string
+	maxAgeDef int
 }
 
 // NewWebRedisStore Creates a pointer to a new RedisTokenStore
 // redisClient: a client connection to redis
 // secretKey: A 32 bytes long string to use for encrypting(using AES) and decryptng the session data
 func NewRedisTokenStore(redisClient *redis.Client, secretKey string, defaultSessionAge int) *RedisTokenStore {
-	return &RedisTokenStore{RedisClient: &RedisStore{Conn: redisClient}, MaxAgeDefault: 1800}
+	return &RedisTokenStore{rcl: &RedisStore{Conn: redisClient}, maxAgeDef: defaultSessionAge}
 }
 
 type Session struct {
@@ -59,7 +58,7 @@ func create(r *http.Request, name string, maxAge int) *Session {
 // name  name assigned to the session token, analogous, perhaps to the cookie name in web sessions
 // This name is always included as an header name in your response and its value is set to be the value of the session id.
 func (rts *RedisTokenStore) GetExisting(r *http.Request, name string) (*Session, error) {
-	rs := rts.RedisClient
+	rs := rts.rcl
 
 	if sessionID := r.Header.Get(name); len(sessionID) > 0 {
 
@@ -91,7 +90,7 @@ func (rts *RedisTokenStore) GetExisting(r *http.Request, name string) (*Session,
 // name  name assigned to the session token, analogous, perhaps to the cookie name in web sessions
 // This name is always included as an header name in your response and its value is set to be the value of the session id.
 func (rts *RedisTokenStore) Get(r *http.Request, name string) (*Session, error) {
-	rs := rts.RedisClient
+	rs := rts.rcl
 
 	if sessionID := r.Header.Get(name); len(sessionID) > 0 {
 
@@ -101,7 +100,7 @@ func (rts *RedisTokenStore) Get(r *http.Request, name string) (*Session, error) 
 		if err != nil {
 			//redis may be running on a configuration where it does not save to disk when power is lost.
 			// So give the user a new session here.
-			session := create(r, name, rts.MaxAgeDefault)
+			session := create(r, name, rts.maxAgeDef)
 			return session, nil
 		}
 
@@ -110,25 +109,25 @@ func (rts *RedisTokenStore) Get(r *http.Request, name string) (*Session, error) 
 			session, err := rts.fromToken(sessText)
 			if err != nil {
 				//Data corruption occurred either with redis or the AES algorithm. Give a new session, please
-				session = create(r, name, rts.MaxAgeDefault)
+				session = create(r, name, rts.maxAgeDef)
 				return session, nil
 			}
 			session.IsNew = false
 			return session, nil
 		} else if redisStat == RedisRecordNotFound {
 			//Session possibly has expired in redis; most likely
-			session := create(r, name, rts.MaxAgeDefault)
+			session := create(r, name, rts.maxAgeDef)
 			return session, nil
 		} else {
 			//Weird, weird, weird
-			session := create(r, name, rts.MaxAgeDefault)
+			session := create(r, name, rts.maxAgeDef)
 			return session, nil
 		}
 
 	} else {
 		//Session header set, but with no value... programming error most likely
 		//Most likely from registration or login, since no session header exists
-		session := create(r, name, rts.MaxAgeDefault)
+		session := create(r, name, rts.maxAgeDef)
 		return session, nil
 	}
 
@@ -206,7 +205,7 @@ func (s *Session) DeleteAny(key string) {
 func (rts *RedisTokenStore) token(s *Session) (string, error) {
 	jsn := utils.Stringify(s)
 
-	k, err := utils.NewKryptik(rts.Keys, utils.ModeCBC)
+	k, err := utils.NewKryptik(rts.keys, utils.ModeCBC)
 	if err != nil {
 		return "", err
 	}
@@ -215,7 +214,7 @@ func (rts *RedisTokenStore) token(s *Session) (string, error) {
 
 // Token regenerate the oiginal Session from its token
 func (rts *RedisTokenStore) fromToken(sessionToken string) (*Session, error) {
-	k, err := utils.NewKryptik(rts.Keys, utils.ModeCBC)
+	k, err := utils.NewKryptik(rts.keys, utils.ModeCBC)
 	if err != nil {
 		return nil, err
 	}
@@ -236,21 +235,20 @@ func (rts *RedisTokenStore) Save(s *Session, r *http.Request, w http.ResponseWri
 	if err != nil {
 		return err
 	}
-	redisStat, err := rts.RedisClient.SetWithExpiry(s.ID, tkn, int64(s.MaxAge)) // save session to redis
+	redisStat, err := rts.rcl.SetWithExpiry(s.ID, tkn, int64(s.MaxAge)) // save session to redis
 	if redisStat == RedisRecordUpdated {
 		w.Header().Set(s.Name, s.ID)
-
 	}
 	return err
 }
 
 // Delete Manually delete the session from redis
 func (rts *RedisTokenStore) Delete(s *Session) (int64, error) {
-	rs := rts.RedisClient
+	rs := rts.rcl
 	return rs.Delete(s.ID)
 }
 
 // Close the redis connection once you are done
 func (rts *RedisTokenStore) Close() error {
-	return rts.RedisClient.Close()
+	return rts.rcl.Close()
 }

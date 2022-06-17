@@ -148,7 +148,10 @@ func (s *Session) StoreFloat32(key string, val float32) {
 func (s *Session) StoreFloat64(key string, val float64) {
 	s.Values[key] = val
 }
-func (s *Session) StoreByte(key string, val []byte) {
+func (s *Session) StoreByte(key string, val byte) {
+	s.Values[key] = val
+}
+func (s *Session) StoreBytes(key string, val []byte) {
 	s.Values[key] = val
 }
 func (s *Session) StoreAny(key string, val interface{}) {
@@ -175,6 +178,12 @@ func (s *Session) GetInt(key string, defaultVal int) int {
 }
 func (s *Session) GetByte(key string, defaultVal byte) byte {
 	if bits, ok := s.Values[key].(byte); ok {
+		return bits
+	}
+	return defaultVal
+}
+func (s *Session) GetBytes(key string, defaultVal []byte) []byte {
+	if bits, ok := s.Values[key].([]byte); ok {
 		return bits
 	}
 	return defaultVal

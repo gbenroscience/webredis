@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/gbenroscience/webredis/utils"
@@ -54,30 +55,42 @@ func create(r *http.Request, name string, maxAge int) *Session {
 }
 
 // GetExisting returns a Session if one exists
-func (rts *RedisTokenStore) GetExisting(sessionID string) (*Session, error) {
-	session := new(Session)
+// r The http request
+// name  name assigned to the session token, analogous, perhaps to the cookie name in web sessions
+// This name is always included as an header name in your response and its value is set to be the value of the session id.
+func (rts *RedisTokenStore) GetExisting(r *http.Request, name string) (*Session, error) {
 	rs := rts.RedisClient
 
-	var sessText string
-	redisStat, err := rs.Get(sessionID, &sessText)
+	if sessionID := r.Header.Get(name); len(sessionID) > 0 {
 
-	if err != nil {
-		return nil, err
-	}
+		var sessText string
+		redisStat, err := rs.Get(sessionID, &sessText)
 
-	session, err = rts.fromToken(sessText)
+		if err != nil {
+			return nil, err
+		}
+		if redisStat == RedisRecordFound {
+			// The cached session was retrieved
+			session, err := rts.fromToken(sessText)
+			if err != nil {
+				return nil, err
+			}
+			session.IsNew = false
+			return session, nil
+		} else {
+			return nil, err
+		}
 
-	if redisStat == RedisRecordFound {
-		session.IsNew = false
-		return session, nil
 	} else {
-		return nil, err
+		return nil, errors.New("session does not exist")
 	}
 }
 
 // Get returns a Session if one exists, or creates a new one if not
+// r The http request
+// name  name assigned to the session token, analogous, perhaps to the cookie name in web sessions
+// This name is always included as an header name in your response and its value is set to be the value of the session id.
 func (rts *RedisTokenStore) Get(r *http.Request, name string) (*Session, error) {
-	session := new(Session)
 	rs := rts.RedisClient
 
 	if sessionID := r.Header.Get(name); len(sessionID) > 0 {
@@ -88,13 +101,13 @@ func (rts *RedisTokenStore) Get(r *http.Request, name string) (*Session, error) 
 		if err != nil {
 			//redis may be running on a configuration where it does not save to disk when power is lost.
 			// So give the user a new session here.
-			session = create(r, name, rts.MaxAgeDefault)
+			session := create(r, name, rts.MaxAgeDefault)
 			return session, nil
 		}
 
 		if redisStat == RedisRecordFound {
 			// The cached session was retrieved
-			session, err = rts.fromToken(sessText)
+			session, err := rts.fromToken(sessText)
 			if err != nil {
 				//Data corruption occurred either with redis or the AES algorithm. Give a new session, please
 				session = create(r, name, rts.MaxAgeDefault)
@@ -104,18 +117,18 @@ func (rts *RedisTokenStore) Get(r *http.Request, name string) (*Session, error) 
 			return session, nil
 		} else if redisStat == RedisRecordNotFound {
 			//Session possibly has expired in redis; most likely
-			session = create(r, name, rts.MaxAgeDefault)
+			session := create(r, name, rts.MaxAgeDefault)
 			return session, nil
 		} else {
 			//Weird, weird, weird
-			session = create(r, name, rts.MaxAgeDefault)
+			session := create(r, name, rts.MaxAgeDefault)
 			return session, nil
 		}
 
 	} else {
 		//Session header set, but with no value... programming error most likely
 		//Most likely from registration or login, since no session header exists
-		session = create(r, name, rts.MaxAgeDefault)
+		session := create(r, name, rts.MaxAgeDefault)
 		return session, nil
 	}
 

@@ -249,3 +249,8 @@ func (rts *RedisTokenStore) Delete(s *Session) (int64, error) {
 	rs := rts.RedisClient
 	return rs.Delete(s.ID)
 }
+
+// Close the redis connection once you are done
+func (rts *RedisTokenStore) Close() error {
+	return rts.RedisClient.Close()
+}

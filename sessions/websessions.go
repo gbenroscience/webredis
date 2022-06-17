@@ -226,6 +226,7 @@ func (s *Session) GetAny(key string) interface{} {
 	return s.Values[key]
 }
 
+// DeleteAny You need to call RedisSessionStore.Save to persist this action to redis!
 func (s *Session) DeleteAny(key string) {
 	delete(s.Values, key)
 }

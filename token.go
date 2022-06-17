@@ -197,6 +197,11 @@ func (s *Session) GetAny(key string) interface{} {
 	return s.Values[key]
 }
 
+// DeleteAny You need to call RedisTokenStore.Save to persist this action to redis!
+func (s *Session) DeleteAny(key string) {
+	delete(s.Values, key)
+}
+
 // token generate the encrypted string sent to the browser and stored in Redis
 func (rts *RedisTokenStore) token(s *Session) (string, error) {
 	jsn := utils.Stringify(s)

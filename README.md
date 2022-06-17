@@ -81,13 +81,45 @@ This returns a ```webredis.Session``` object
 In both cases, if the session does not exist, a new one will be created. You may check if a new session was generated for you by using ```sess.IsNew```
 Once created, you may begin to save user data on the session using any of the following:
 
+
+Since ```webredis.Session``` and ```sessions.Session``` implement ```webredis.GenericSession```, which has the following definition:
+
+```Go
+type GenericSession interface {
+	StoreInt(key string, val int)
+	StoreText(key string, val string)
+	StoreBool(key string, val bool)
+	StoreFloat32(key string, val float32)
+	StoreFloat64(key string, val float64)
+	StoreByte(key string, val byte)
+	StoreBytes(key string, val []byte)
+	StoreAny(key string, val interface{})
+
+	GetText(key string, defaultVal string) string
+	GetBoolean(key string, defaultVal bool) bool
+	GetInt(key string, defaultVal int) int
+	GetByte(key string, defaultVal byte) byte
+	GetBytes(key string, defaultVal []byte) []byte
+	GetFloat32(key string, defaultVal float32) float32
+	GetFloat64(key string, defaultVal float64) float64
+
+	GetAny(key string) interface{}
+
+	// DeleteAny You need to call RedisSessionStore.Save to persist this action to redis!
+	DeleteAny(key string)
+}
+```
+
+You may store values on both session types using any of the ```session.StoreXXX``` methods, e.g:
+
 ```Go
 sess.StoreInt("number-here", 223)
 sess.StoreText("text-here", "User name")
 sess.StoreBool("boolean-here", true)
 sess.StoreFloat32("float32-key", 3.143)
 sess.StoreFloat64("float64-key", 3.143)
-sess.StoreByte("byte-key", []byte{1, 2, 3, 101})
+sess.StoreByte("byte-key", 4)
+sess.StoreBytes("bytes-key", []byte{1, 2, 3, 101})
 
 type Boy struct{
 Age int
@@ -100,13 +132,24 @@ boy.Color = "brown"
 boy.Height = 1.51
 sess.StoreAny("anykey-goes", boy)
 ```
+and you may get the value from the session using any of the ```session.GetXXX``` methods, also.
+The ```session.GetXXX``` (with the exception of the ```session.GetAny``` method) will return a default value, if the key does not exist in the session's map.
+So if you do, 
+```Go
+sess.StoreText("color", "red")
+```
+as the only storage operation on a session; and then do:
 
-Both the webredis.Session and the sessions.Session have these functions
+```Go
+name := sess.GetText("name", "Wilberforce Ezeilo")
+fmt.Println(name)
+```
+"Wilberforce Ezeilo" will be printed out, since the session has no key, ```name```.
 
 To delete some data from a session, do:
 
 ```Go
-sess.DeleteAny("field")
+sess.DeleteAny("key")
 ```
 
 Once you have saved data to, or deleted data from a Session, make sure you persist it to **redis** by calling:
@@ -128,8 +171,6 @@ You may delete a session totally by doing:
 redisTokenStore.Delete(sess)
 webSessionStore.Delete(sess)
 ```
-
-
 
 When closing your server application, remember to call ```webSessionStore.Close()``` or ```redisTokenStore.Close()```
 This will close the connections to ```redis```

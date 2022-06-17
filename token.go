@@ -26,7 +26,7 @@ type RedisTokenStore struct {
 // redisClient: a client connection to redis
 // secretKey: A 32 bytes long string to use for encrypting(using AES) and decryptng the session data
 func NewRedisTokenStore(redisClient *redis.Client, secretKey string, defaultSessionAge int) *RedisTokenStore {
-	return &RedisTokenStore{rcl: &RedisStore{Conn: redisClient}, maxAgeDef: defaultSessionAge}
+	return &RedisTokenStore{rcl: &RedisStore{Conn: redisClient}, keys: secretKey, maxAgeDef: defaultSessionAge}
 }
 
 type Session struct {

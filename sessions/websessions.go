@@ -51,7 +51,7 @@ type Session struct {
 // secretKey: A 32 bytes long string to use for encrypting(using AES) and decryptng the session data
 // defaultSessionAge: The age to apply to all sessions by default.It may be changed per session later
 func NewWebRedisStore(redisClient *redis.Client, secretKey string, defaultSessionAge int) *RedisSessionStore {
-	return &RedisSessionStore{rcl: &webredis.RedisStore{Conn: redisClient}, maxAgeDefault: defaultSessionAge}
+	return &RedisSessionStore{rcl: &webredis.RedisStore{Conn: redisClient}, keys: secretKey, maxAgeDefault: defaultSessionAge}
 }
 
 // GetExisting returns a Session if one exists

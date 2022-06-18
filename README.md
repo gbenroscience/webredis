@@ -59,9 +59,9 @@ To create a session store for a generic backend, do:
 redisTokenStore := webredis.NewRedisTokenStore(client, "32-byte-key-for-session-encoding", 7200)
 ```
 
-The ```client``` parameter is a ```*redis.Client```
-The 2nd parameter is a 32 byte key used for encrypting the sessions
-The 3rd parameter is the time in seconds that represents how long the session will live before it is expired by redis.
+1. The ```client``` parameter is a ```*redis.Client```
+2. The 2nd parameter is a 32 byte key used for encrypting the sessions
+3. The 3rd parameter is the time in seconds that represents how long the session will live before it is expired by redis.
 
 The 2 kinds of store implement the ```GenericStore``` interface, which is so defined:
 

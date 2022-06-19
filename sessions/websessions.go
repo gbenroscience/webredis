@@ -78,7 +78,6 @@ func (rss *RedisSessionStore) GetExisting(sessionID string) (*Session, error) {
 
 // Get returns a Session if one exists, or creates a new one if not
 func (rss *RedisSessionStore) Get(r *http.Request, name string) (*Session, error) {
-	session := new(Session)
 	rs := rss.rcl
 
 	if c, err := r.Cookie(name); err == nil {
@@ -90,13 +89,13 @@ func (rss *RedisSessionStore) Get(r *http.Request, name string) (*Session, error
 			if err != nil {
 				//redis may be running on a configuration where it does not save to disk when power is lost.
 				// So give the user a new session here.
-				session = create(r, name, rss.maxAgeDefault)
+				session := create(r, name, rss.maxAgeDefault)
 				return session, nil
 			}
 
 			if redisStat == webredis.RedisRecordFound {
 				// The cached session was retrieved
-				session, err = rss.fromToken(sessText)
+				session, err := rss.fromToken(sessText)
 				if err != nil {
 					//Data corruption occurred either with redis or the AES algorithm. Give a new session, please
 					session = create(r, name, rss.maxAgeDefault)
@@ -106,24 +105,24 @@ func (rss *RedisSessionStore) Get(r *http.Request, name string) (*Session, error
 				return session, nil
 			} else if redisStat == webredis.RedisRecordNotFound {
 				//Session possibly has expired in redis; most likely
-				session = create(r, name, rss.maxAgeDefault)
+				session := create(r, name, rss.maxAgeDefault)
 				return session, nil
 			} else {
 				//Weird, weird, weird
-				session = create(r, name, rss.maxAgeDefault)
+				session := create(r, name, rss.maxAgeDefault)
 				return session, nil
 			}
 		} else {
 			//Session cookie set, but with no value... programming error most likely
 			//Most likely from registration or login, since no session header exists
-			session = create(r, name, rss.maxAgeDefault)
+			session := create(r, name, rss.maxAgeDefault)
 			return session, nil
 		}
 
 	} else {
 		//Session cookie not set
 		//Most likely from registration or login, since no session header exists
-		session = create(r, name, rss.maxAgeDefault)
+		session := create(r, name, rss.maxAgeDefault)
 		return session, nil
 	}
 

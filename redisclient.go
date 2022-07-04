@@ -100,7 +100,7 @@ func (rds *RedisStore) DeleteFromSet(nameOfSet, value string) (bool, error) {
 	}
 }
 
-// Get ..
+// Get ...
 // key is the name of the key whose value we wish to retrieve,
 // dest .. is a pointer to the interface that we wish to decode the value into.
 func (rds *RedisStore) Get(key string, dest interface{}) (int, error) {

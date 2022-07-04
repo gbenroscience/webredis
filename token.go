@@ -70,7 +70,7 @@ func (rts *RedisTokenStore) GetExisting(r *http.Request, name string) (*Session,
 		}
 		if redisStat == RedisRecordFound {
 			// The cached session was retrieved
-			session, err := rts.fromToken(sessText)
+			session, err := fromToken(sessText, rts.keys)
 			if err != nil {
 				return nil, err
 			}
@@ -106,7 +106,7 @@ func (rts *RedisTokenStore) Get(r *http.Request, name string) (*Session, error) 
 
 		if redisStat == RedisRecordFound {
 			// The cached session was retrieved
-			session, err := rts.fromToken(sessText)
+			session, err := fromToken(sessText, rts.keys)
 			if err != nil {
 				//Data corruption occurred either with redis or the AES algorithm. Give a new session, please
 				session = create(r, name, rts.maxAgeDef)
@@ -211,10 +211,10 @@ func (s *Session) DeleteAny(key string) {
 }
 
 // token generate the encrypted string sent to the browser and stored in Redis
-func (rts *RedisTokenStore) token(s *Session) (string, error) {
+func token(s *Session, keys string) (string, error) {
 	jsn := utils.Stringify(s)
 
-	k, err := utils.NewKryptik(rts.keys, utils.ModeCBC)
+	k, err := utils.NewKryptik(keys, utils.ModeCBC)
 	if err != nil {
 		return "", err
 	}
@@ -222,8 +222,8 @@ func (rts *RedisTokenStore) token(s *Session) (string, error) {
 }
 
 // Token regenerate the oiginal Session from its token
-func (rts *RedisTokenStore) fromToken(sessionToken string) (*Session, error) {
-	k, err := utils.NewKryptik(rts.keys, utils.ModeCBC)
+func fromToken(sessionToken string, keys string) (*Session, error) {
+	k, err := utils.NewKryptik(keys, utils.ModeCBC)
 	if err != nil {
 		return nil, err
 	}
@@ -239,7 +239,7 @@ func (rts *RedisTokenStore) fromToken(sessionToken string) (*Session, error) {
 // Save saves a session in redis
 func (rts *RedisTokenStore) Save(s *Session, r *http.Request, w http.ResponseWriter) error {
 
-	tkn, err := rts.token(s)
+	tkn, err := token(s, rts.keys)
 
 	if err != nil {
 		return err

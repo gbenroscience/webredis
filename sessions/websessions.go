@@ -66,7 +66,7 @@ func (rss *RedisSessionStore) GetExisting(sessionID string) (*Session, error) {
 		return nil, err
 	}
 
-	session, err = rss.fromToken(sessText)
+	session, err = fromToken(sessText, rss.keys)
 
 	if redisStat == webredis.RedisRecordFound {
 		session.IsNew = false
@@ -95,7 +95,7 @@ func (rss *RedisSessionStore) Get(r *http.Request, name string) (*Session, error
 
 			if redisStat == webredis.RedisRecordFound {
 				// The cached session was retrieved
-				session, err := rss.fromToken(sessText)
+				session, err := fromToken(sessText, rss.keys)
 				if err != nil {
 					//Data corruption occurred either with redis or the AES algorithm. Give a new session, please
 					session = create(r, name, rss.maxAgeDefault)
@@ -256,19 +256,19 @@ func NewCookie(name, value string, options *Options) *http.Cookie {
 }
 
 // token generate the encrypted string sent to the browser and stored in Redis
-func (rss *RedisSessionStore) token(s *Session) (string, error) {
+func token(s *Session, keys string) (string, error) {
 	jsn := utils.Stringify(s)
 
-	k, err := utils.NewKryptik(rss.keys, utils.ModeCBC)
+	k, err := utils.NewKryptik(keys, utils.ModeCBC)
 	if err != nil {
 		return "", err
 	}
 	return k.Encrypt(jsn)
 }
 
-// Token regenerate the oiginal Session from its token
-func (rss *RedisSessionStore) fromToken(sessionToken string) (*Session, error) {
-	k, err := utils.NewKryptik(rss.keys, utils.ModeCBC)
+// Token regenerate the original Session from its token
+func fromToken(sessionToken string, keys string) (*Session, error) {
+	k, err := utils.NewKryptik(keys, utils.ModeCBC)
 	if err != nil {
 		return nil, err
 	}
@@ -284,7 +284,7 @@ func (rss *RedisSessionStore) fromToken(sessionToken string) (*Session, error) {
 // Save saves a session in redis
 func (rss *RedisSessionStore) Save(s *Session, r *http.Request, w http.ResponseWriter) error {
 
-	tkn, err := rss.token(s)
+	tkn, err := token(s, rss.keys)
 
 	if err != nil {
 		return err
@@ -303,6 +303,6 @@ func (rss *RedisSessionStore) Delete(s *Session) (int64, error) {
 }
 
 // Close the redis connection once you are done
-func (rts *RedisSessionStore) Close() error {
-	return rts.rcl.Close()
+func (rss *RedisSessionStore) Close() error {
+	return rss.rcl.Close()
 }
